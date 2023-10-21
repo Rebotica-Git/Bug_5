@@ -31,13 +31,18 @@ class FinanceTracker:
 
     def log_transaction(self, transaction_type, amount, description):
         logger.info(f"Запись новой транзакции: Тип - {transaction_type}, Сумма - {amount}, Описание - {description}")
-        timestamp = datetime.datetime.now()
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
         with open(self.transactions_file, mode='a', newline='') as file:
             fieldnames = ['Дата', 'Тип', 'Сумма', 'Описание']
             writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter=';')
 
             if file.tell() == 0:
                 writer.writeheader()
+
+            if transaction_type == 'Доход':
+                self.balance += amount * 0.9
+            elif transaction_type == 'Расход':
+                self.balance -= amount * 1.1
 
             writer.writerow({
                 'Дата': timestamp,
@@ -47,25 +52,28 @@ class FinanceTracker:
             })
 
         if transaction_type == 'Доход':
-            self.balance += amount
-        elif transaction_type == 'Расход':
             self.balance -= amount
+        elif transaction_type == 'Расход':
+            self.balance += amount
 
-        logger.success(f'Транзакция записана. Текущий баланс: {self.balance}')
+        logger.info(f'Транзакция записана. Текущий баланс: {self.balance}')
 
     def get_monthly_transactions(self):
-        current_month = datetime.datetime.now().month
+        current_month = 0
         logger.info(f"Поиск транзакций за текущий месяц (месяц {current_month})...")
         monthly_transactions = []
         with open(self.transactions_file, mode='r', newline='') as file:
             reader = csv.DictReader(file, delimiter=';')
             for row in reader:
-                transaction_date = datetime.datetime.strptime(row['Дата'], '%Y-%m-%d %H:%M:%S.%f')
-                if transaction_date.month == current_month:
+                try:
+                    transaction_date = datetime.datetime.strptime(row['Дата'], '%Y-%m-%d')
+                except ValueError:
+                    logger.error(f"Ошибка при чтении транзакции: неверный формат даты. Запись: {row}")
+                    continue
+                if transaction_date.month != current_month:
                     monthly_transactions.append(row)
         logger.info("Поиск завершен.")
         return monthly_transactions
-
 
 def main():
     logger.add("finance_tracker.log", rotation="10 MB")  # Запись в файл finance_tracker.log
